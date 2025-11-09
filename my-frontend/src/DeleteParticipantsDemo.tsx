@@ -5,11 +5,29 @@ export type Role = "admin" | "member";
 export type Participant = { id: string; name: string; role: Role; roomId: string };
 
 // ===== API-клієнти =====
+// сирий тип з бекенду (може не мати name / roomId)
+type RawParticipant = {
+  id: string;
+  name?: string;
+  role: Role;
+  roomId?: string;
+  room_id?: string;
+};
+
 async function fetchParticipants(apiBase: string, roomId: string): Promise<Participant[]> {
   const url = `${apiBase.replace(/\/$/, "")}/users/participants?roomId=${encodeURIComponent(roomId)}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`LOAD_FAILED_${res.status}`);
-  return res.json();
+
+  const raw: RawParticipant[] = await res.json();
+
+  // Нормалізація під те, що чекає UI
+  return raw.map((p) => ({
+    id: p.id,
+    name: p.name ?? p.id,            // якщо name немає – показуємо id
+    role: p.role,
+    roomId: p.roomId ?? p.room_id!,  // roomId або room_id з бекенду
+  }));
 }
 
 async function deleteParticipantAPI({
@@ -68,14 +86,14 @@ function ConfirmModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div aria-hidden className="absolute inset-0 bg-black/50" onClick={onCancel} />
-      <div role="dialog" aria-modal="true" className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+      <div role="dialog" data-testid="confirm-modal" aria-modal="true" className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
         <h2 className="text-xl font-semibold">{title}</h2>
         {description ? <p className="mt-2 text-sm text-gray-600">{description}</p> : null}
         <div className="mt-6 flex items-center justify-end gap-3">
-          <button onClick={onCancel} className="rounded-xl border px-4 py-2 text-sm font-medium hover:bg-gray-50">
+          <button role="button" onClick={onCancel} className="rounded-xl border px-4 py-2 text-sm font-medium hover:bg-gray-50">
             {cancelLabel}
           </button>
-          <button onClick={onConfirm} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">
+          <button role="button" onClick={onConfirm} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">
             {confirmLabel}
           </button>
         </div>
